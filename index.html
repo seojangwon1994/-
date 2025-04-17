@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>배럭 레이드 정리</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      background-color: #f0fff0;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    input, .button-mokoko {
+      margin: 10px 0;
+      width: 100%;
+      padding: 12px;
+      font-size: 1em;
+      border-radius: 25px;
+      border: 2px solid #89c63f;
+      box-sizing: border-box;
+    }
+
+    .button-mokoko {
+      background: #a8e060;
+      color: #2d3a00;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      display: inline-block;
+    }
+
+    .button-mokoko:hover {
+      background: #c2f18a;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 10px 0;
+      background: #f9f9f9;
+    }
+
+    #results {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>배럭 레이드 정리</h2>
+
+  <input id="charName" placeholder="캐릭터 이름" />
+  <input id="apiKey" placeholder="API 키" />
+
+  <button class="button-mokoko" onclick="fetchData()">실행하기</button>
+  <a href="https://developer-lostark.game.onstove.com/" target="_blank" class="button-mokoko">로아 API</a>
+
+  <div id="results"></div>
+
+  <script>
+    async function fetchData() {
+      const name = document.getElementById("charName").value.trim();
+      const token = document.getElementById("apiKey").value.trim();
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "불러오는 중...";
+
+      if (!name || !token) {
+        resultsDiv.innerHTML = "캐릭터 이름과 API 키를 모두 입력해주세요.";
+        return;
+      }
+
+      const bearerToken = "Bearer " + token;
+      const proxyUrl = "/.netlify/functions/proxy";
+      const url = `${proxyUrl}?name=${encodeURIComponent(name)}&token=${encodeURIComponent(bearerToken)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!Array.isArray(data)) {
+          resultsDiv.innerHTML = "오류: " + JSON.stringify(data);
+          return;
+        }
+
+        const filtered = data.map(char => {
+          const level = parseFloat(char.ItemAvgLevel.replace(/,/g, ''));
+          const contents = getContents(level);
+          return {
+            name: char.CharacterName || "",
+            className: char.CharacterClassName || "",
+            level: level || "",
+            contents
+          };
+        }).filter(c => c.level >= 1640)
+          .sort((a, b) => b.level - a.level)
+          .slice(0, 6);
+
+        resultsDiv.innerHTML = "";
+        filtered.forEach(c => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `<b>${c.name}</b> (${c.className})<br>
+            아이템 레벨: ${c.level}<br>
+            추천 콘텐츠: ${c.contents.join(", ")}`;
+          resultsDiv.appendChild(div);
+        });
+
+        if (filtered.length === 0) resultsDiv.innerHTML = "조건에 맞는 캐릭터가 없습니다.";
+
+      } catch (e) {
+        resultsDiv.innerHTML = "에러 발생: " + e.message;
+      }
+    }
+
+    function getContents(level) {
+      if (level >= 1720) return ['강습하드', '3막하드', '2막하드', '카멘하드'];
+      if (level >= 1700) return ['강습노말', '3막하드', '2막하드', '카멘하드'];
+      if (level >= 1690) return ['강습노말', '3막노말', '2막하드', '베히모스'];
+      if (level >= 1680) return ['강습노말', '3막노말', '1막하드', '2막노말'];
+      if (level >= 1670) return ['2막노말', '1막노말', '베히모스', '에키드나'];
+      if (level >= 1660) return ['1막노말', '베히모스', '에키드나'];
+      if (level >= 1640) return ['베히모스', '에키드나', '카멘하드'];
+      return [];
+    }
+  </script>
+</body>
+</html>
